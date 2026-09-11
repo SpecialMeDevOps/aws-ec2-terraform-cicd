@@ -101,24 +101,16 @@ Terraform creates:
 - A public IP address
 - Docker installation and container startup through EC2 `user_data`
 
-## Shared Terraform state
+## Terraform state
 
-The GitHub Actions workflows use an encrypted S3 backend with native S3 state
-locking. Create the S3 bucket once before running the workflow, enable bucket
-versioning, and block all public access. Then add this GitHub Actions variable:
+This simple setup uses Terraform's local state file. Because GitHub-hosted
+runners are temporary, the apply workflow uploads `terraform.tfstate` as a
+GitHub Actions artifact after a successful apply. The manual destroy workflow
+downloads that artifact from the selected apply run and uses the same state.
 
-- `TF_STATE_BUCKET` - the existing private S3 bucket name
-
-Both apply and destroy use the same state key:
-
-```text
-terraform-ec2/terraform.tfstate
-```
-
-This shared state is required because GitHub-hosted runners are temporary. The
-repository does not create the backend bucket automatically, avoiding a
-circular dependency where Terraform would need state before it could create
-its own state storage.
+No S3 bucket, S3 state variable, Terraform Cloud, or remote backend is used.
+State artifacts contain sensitive infrastructure data, so keep repository
+access restricted and do not download or share them unnecessarily.
 
 ## GitHub Actions setup
 
@@ -145,7 +137,6 @@ Add these under **Settings > Secrets and variables > Actions > Secrets**:
 Add these under **Settings > Secrets and variables > Actions > Variables**:
 
 - `AWS_REGION`
-- `TF_STATE_BUCKET`
 
 Optional variables:
 
@@ -155,6 +146,18 @@ Optional variables:
 The GitHub Actions `GITHUB_TOKEN` is used to push the image to GHCR. Make the
 GHCR package public, or add a private-registry pull login to the EC2 startup
 script before deploying a private image.
+
+## Manual destroy
+
+The destroy workflow is manual-only. In **Actions**, open **Manual Terraform
+Destroy**, click **Run workflow**, and enter the run ID of a successful Apply
+workflow that contains the `terraform-state` artifact. The workflow verifies
+that state exists before running `terraform destroy -auto-approve`.
+
+If the original apply state artifact was deleted or never uploaded, do not run
+destroy. First recover the state from that apply runner or import the existing
+AWS resources into a new local state; without state Terraform cannot reliably
+know which resources it should destroy.
 
 ## Accessing the deployed app
 

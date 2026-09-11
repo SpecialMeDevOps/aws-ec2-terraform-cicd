@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: read
 
 env:
   TF_IN_AUTOMATION: true
@@ -52,24 +53,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
+      # Restore the latest state so repeated apply runs manage existing resources.
+      # On the first run there is no artifact yet, so the step only warns.
+      - name: Restore latest Terraform state
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: terraform.yml
+          branch: main
+          name: terraform-state
+          path: .
+          search_artifacts: true
+          if_no_artifact_found: warn
+          github_token: ${{ github.token }}
+
       - name: Terraform format check
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        env:
-          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-          AWS_REGION_VALUE: ${{ vars.AWS_REGION || 'us-east-1' }}
-        run: |
-          if [[ -z "$TF_STATE_BUCKET" ]]; then
-            echo "::error::GitHub Actions variable TF_STATE_BUCKET is missing."
-            exit 1
-          fi
-          terraform init \
-            -backend-config="bucket=$TF_STATE_BUCKET" \
-            -backend-config="key=terraform-ec2/terraform.tfstate" \
-            -backend-config="region=$AWS_REGION_VALUE" \
-            -backend-config="encrypt=true" \
-            -backend-config="use_lockfile=true"
+        run: terraform init
 
       - name: Terraform validate
         run: terraform validate
@@ -89,3 +91,12 @@ jobs:
 
       - name: Terraform apply
         run: terraform apply -auto-approve tfplan
+
+      # Preserve local state for the separate manual destroy workflow.
+      - name: Upload Terraform state
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state
+          path: terraform.tfstate
+          if-no-files-found: error
+          retention-days: 30

@@ -1,13 +1,18 @@
 name: Manual Terraform Destroy
 
-# This workflow is intentionally manual-only.
-# It never runs on push or pull_request and deletes resources tracked in the
-# same S3 state used by the deployment workflow.
+# Manual-only workflow. It does not run on push or pull_request.
+# Enter the successful Apply workflow run ID whose state should be destroyed.
 on:
   workflow_dispatch:
+    inputs:
+      apply_run_id:
+        description: "Successful Apply workflow run ID containing terraform-state"
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 env:
   TF_IN_AUTOMATION: true
@@ -30,23 +35,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
-      - name: Terraform init with shared state
-        env:
-          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-          AWS_REGION_VALUE: ${{ vars.AWS_REGION || 'us-east-1' }}
+      # Restore the exact local state uploaded by the selected Apply run.
+      - name: Download Terraform state
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-state
+          path: .
+          run-id: ${{ inputs.apply_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify Terraform state
+        shell: bash
         run: |
-          if [[ -z "$TF_STATE_BUCKET" ]]; then
-            echo "::error::GitHub Actions variable TF_STATE_BUCKET is missing."
+          if [[ ! -s terraform.tfstate ]]; then
+            echo "::error::Terraform state was not found or is empty. Destroy stopped safely."
             exit 1
           fi
-          terraform init \
-            -backend-config="bucket=$TF_STATE_BUCKET" \
-            -backend-config="key=terraform-ec2/terraform.tfstate" \
-            -backend-config="region=$AWS_REGION_VALUE" \
-            -backend-config="encrypt=true" \
-            -backend-config="use_lockfile=true"
+
+      - name: Terraform init
+        run: terraform init
 
       - name: Terraform destroy
-        env:
-          AWS_REGION_VALUE: ${{ vars.AWS_REGION || 'us-east-1' }}
-        run: terraform destroy -auto-approve -var="aws_region=$AWS_REGION_VALUE"
+        run: terraform destroy -auto-approve -var="aws_region=${{ vars.AWS_REGION || 'us-east-1' }}"
