@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./app
-          file: ./app/dockerfile
+          file: ./app/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:latest
@@ -56,7 +56,20 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform init
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          AWS_REGION_VALUE: ${{ vars.AWS_REGION || 'us-east-1' }}
+        run: |
+          if [[ -z "$TF_STATE_BUCKET" ]]; then
+            echo "::error::GitHub Actions variable TF_STATE_BUCKET is missing."
+            exit 1
+          fi
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=terraform-ec2/terraform.tfstate" \
+            -backend-config="region=$AWS_REGION_VALUE" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
 
       - name: Terraform validate
         run: terraform validate

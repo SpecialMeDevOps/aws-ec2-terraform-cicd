@@ -1,0 +1,11 @@
+aws_region       = "us-east-1"
+project_name     = "terraform-ec2"
+instance_type    = "t2.micro"
+allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+app_port         = 8501
+docker_image     = "ghcr.io/YOUR_GITHUB_USERNAME/terraform-ec2-streamlit:latest"
+
+tags = {
+  Environment = "dev"
+  ManagedBy   = "Terraform"
+}

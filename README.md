@@ -26,7 +26,7 @@ AWS EC2
 .
 |-- app/
 |   |-- app.py              # Streamlit frontend
-|   `-- dockerfile           # Streamlit Docker image
+|   `-- Dockerfile           # Streamlit Docker image
 |-- .github/workflows/
 |   `-- terraform.yml       # Build, push, and deploy pipeline
 |-- main.tf                 # AWS provider, EC2, VPC data, and security group
@@ -101,6 +101,25 @@ Terraform creates:
 - A public IP address
 - Docker installation and container startup through EC2 `user_data`
 
+## Shared Terraform state
+
+The GitHub Actions workflows use an encrypted S3 backend with native S3 state
+locking. Create the S3 bucket once before running the workflow, enable bucket
+versioning, and block all public access. Then add this GitHub Actions variable:
+
+- `TF_STATE_BUCKET` - the existing private S3 bucket name
+
+Both apply and destroy use the same state key:
+
+```text
+terraform-ec2/terraform.tfstate
+```
+
+This shared state is required because GitHub-hosted runners are temporary. The
+repository does not create the backend bucket automatically, avoiding a
+circular dependency where Terraform would need state before it could create
+its own state storage.
+
 ## GitHub Actions setup
 
 The workflow in `.github/workflows/terraform.yml` runs on pushes to `main` or
@@ -108,7 +127,7 @@ manually through `workflow_dispatch`.
 
 It automatically:
 
-1. Builds the image from `app/dockerfile`.
+1. Builds the image from `app/Dockerfile`.
 2. Pushes `latest` and the commit-tagged image to GHCR.
 3. Runs Terraform formatting, initialization, validation, and plan.
 4. Applies the Terraform plan.
@@ -126,6 +145,7 @@ Add these under **Settings > Secrets and variables > Actions > Secrets**:
 Add these under **Settings > Secrets and variables > Actions > Variables**:
 
 - `AWS_REGION`
+- `TF_STATE_BUCKET`
 
 Optional variables:
 
