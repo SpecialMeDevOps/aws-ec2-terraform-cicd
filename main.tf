@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
@@ -32,22 +36,26 @@ data "aws_subnets" "default" {
   }
 }
 
+resource "random_id" "resource_suffix" {
+  byte_length = 4
+}
+
 resource "tls_private_key" "ec2" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
 resource "aws_key_pair" "ec2" {
-  key_name   = "${var.project_name}-generated-key"
+  key_name   = "${var.project_name}-key-${random_id.resource_suffix.hex}"
   public_key = tls_private_key.ec2.public_key_openssh
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-generated-key"
+    Name = "${var.project_name}-key-${random_id.resource_suffix.hex}"
   })
 }
 
 resource "aws_security_group" "ec2" {
-  name        = "${var.project_name}-sg"
+  name        = "${var.project_name}-sg-${random_id.resource_suffix.hex}"
   description = "Security group for the ${var.project_name} EC2 instance"
   vpc_id      = data.aws_vpc.default.id
 
@@ -76,7 +84,7 @@ resource "aws_security_group" "ec2" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-sg"
+    Name = "${var.project_name}-sg-${random_id.resource_suffix.hex}"
   })
 }
 
