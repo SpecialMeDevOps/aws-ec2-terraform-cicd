@@ -6,11 +6,19 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+data "aws_ssm_parameter" "amazon_linux_2023_ami" {
+  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
 data "aws_vpc" "default" {
@@ -22,6 +30,20 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+}
+
+resource "tls_private_key" "ec2" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "ec2" {
+  key_name   = "${var.project_name}-generated-key"
+  public_key = tls_private_key.ec2.public_key_openssh
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-generated-key"
+  })
 }
 
 resource "aws_security_group" "ec2" {
@@ -59,10 +81,10 @@ resource "aws_security_group" "ec2" {
 }
 
 resource "aws_instance" "app" {
-  ami                         = var.ami_id
+  ami                         = coalesce(var.ami_id, data.aws_ssm_parameter.amazon_linux_2023_ami.value)
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
-  key_name                    = var.key_name
+  key_name                    = aws_key_pair.ec2.key_name
   vpc_security_group_ids      = [aws_security_group.ec2.id]
   associate_public_ip_address = true
 

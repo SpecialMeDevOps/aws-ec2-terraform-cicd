@@ -10,8 +10,10 @@ variable "project_name" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for the EC2 instance. Use an AMI available in aws_region."
+  description = "Optional AMI ID. If omitted, the latest Amazon Linux 2023 AMI is used."
   type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "instance_type" {
@@ -21,8 +23,10 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-  description = "Name of the existing EC2 key pair."
+  description = "Deprecated. Terraform creates and uses its own EC2 key pair."
   type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "allowed_ssh_cidr" {

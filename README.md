@@ -70,16 +70,19 @@ Before deployment, update `terraform.tfvars`:
 ```hcl
 aws_region       = "us-east-1"
 project_name     = "terraform-ec2"
-ami_id           = "ami-your-region-specific-id"
 instance_type    = "t2.micro"
-key_name         = "your-existing-key-pair-name"
 allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
 app_port         = 8501
-docker_image     = "ghcr.io/YOUR_GITHUB_USERNAME/terraform-ec2-streamlit:latest"
+docker_image     = "nginx:latest"
 ```
 
-The AMI must exist in the selected AWS region, and the EC2 key pair must
-already exist in AWS.
+If `ami_id` is omitted, Terraform automatically selects the latest Amazon
+Linux 2023 AMI for the selected region. Terraform also creates an RSA EC2 key
+pair automatically. Retrieve its private key securely with:
+
+```bash
+terraform output -raw generated_private_key_pem
+```
 
 Run Terraform locally:
 
@@ -118,13 +121,11 @@ Add these under **Settings > Secrets and variables > Actions > Secrets**:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
-### Required GitHub variables
+### GitHub variables
 
 Add these under **Settings > Secrets and variables > Actions > Variables**:
 
 - `AWS_REGION`
-- `AMI_ID`
-- `EC2_KEY_NAME`
 
 Optional variables:
 

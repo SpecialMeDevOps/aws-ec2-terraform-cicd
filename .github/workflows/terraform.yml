@@ -62,13 +62,15 @@ jobs:
         run: terraform validate
 
       - name: Terraform plan
+        env:
+          AWS_REGION_VALUE: ${{ vars.AWS_REGION || 'us-east-1' }}
+          PROJECT_NAME_VALUE: ${{ vars.PROJECT_NAME || 'terraform-ec2' }}
+          ALLOWED_SSH_CIDR_VALUE: ${{ vars.ALLOWED_SSH_CIDR || '0.0.0.0/0' }}
         run: >-
           terraform plan
-          -var="aws_region=${{ vars.AWS_REGION || 'us-east-1' }}"
-          -var="ami_id=${{ vars.AMI_ID }}"
-          -var="key_name=${{ vars.EC2_KEY_NAME }}"
-          -var="project_name=${{ vars.PROJECT_NAME || 'terraform-ec2' }}"
-          -var="allowed_ssh_cidr=${{ vars.ALLOWED_SSH_CIDR || '0.0.0.0/0' }}"
+          -var="aws_region=$AWS_REGION_VALUE"
+          -var="project_name=$PROJECT_NAME_VALUE"
+          -var="allowed_ssh_cidr=$ALLOWED_SSH_CIDR_VALUE"
           -var="docker_image=${{ env.IMAGE_NAME }}:${{ github.sha }}"
           -out=tfplan
 
